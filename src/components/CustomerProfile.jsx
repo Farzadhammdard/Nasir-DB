@@ -17,7 +17,7 @@ export default function CustomerProfile({ id }) {
     Promise.all([fetch('/api/auth/me').then((response)=>response.json()),fetch(`/api/customers/${id}`).then((response)=>response.json())])
       .then(([session,result])=>{
         if (!active) return;
-        if (!session.user) { router.replace('/login'); return; }
+        if (!session.user) { router.replace('/'); return; }
         if (result?.error) throw new Error(result.error.message || 'پروفایل مشتری بارگذاری نشد.');
         setCustomer(result);
       })

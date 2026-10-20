@@ -14,7 +14,7 @@ export default async function BillPrintPage({ params }) {
   try {
     await withJsonStore(() => requirePermission('bills.view'));
   } catch {
-    redirect('/login');
+    redirect('/');
   }
   const { bill, items, config } = await withJsonStore(() => {
     const currentBill = get('SELECT b.*,c.customer_number,c.name AS customer_name,c.phone AS customer_phone FROM bills b JOIN customers c ON c.id=b.customer_id WHERE b.id=? AND b.deleted_at IS NULL',[Number(id)]);

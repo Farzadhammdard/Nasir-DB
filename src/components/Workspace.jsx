@@ -178,7 +178,7 @@ export default function Workspace({ section }) {
       try {
         const response = await fetch('/api/auth/me');
         const result = await response.json();
-        if (!result.user) { router.replace('/login'); return; }
+        if (!result.user) { router.replace('/'); return; }
         if (!active) return;
         setUser(result.user);
         if (sessionStorage.getItem('nasirdb-login-notice')) {
@@ -293,7 +293,7 @@ export default function Workspace({ section }) {
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
-    router.replace('/login');
+    router.replace('/');
   }
 
   async function toggleUser(userRow) {
