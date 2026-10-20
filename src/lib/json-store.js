@@ -13,6 +13,7 @@ import {
 const JSON_FORMAT = 'nasirdb-database-v2';
 const BLOB_PATH = 'companymanager/database-v2.json';
 const LOCAL_FILE = 'companymanager-v2.json';
+const MAX_BLOB_WRITE_ATTEMPTS = 5;
 let queue = Promise.resolve();
 
 function useBlobStorage() {
@@ -114,35 +115,49 @@ export async function withJsonStore(operation) {
   await previous;
 
   try {
-    const { document, etag } = useBlobStorage()
-      ? await readBlobDocument()
-      : readLocalDocument();
+    const blobStorage = useBlobStorage();
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        const { document, etag } = blobStorage
+          ? await readBlobDocument()
+          : readLocalDocument();
 
-    const db = getDb({ seed: false });
-    importDatabaseTables(document?.tables ?? {});
-    const originalTables = document ? JSON.stringify(document.tables) : null;
-    const result = await operation();
-    const tables = exportDatabaseTables();
+        const db = getDb({ seed: false });
+        importDatabaseTables(document?.tables ?? {});
+        const originalTables = document ? JSON.stringify(document.tables) : null;
+        const result = await operation();
+        const tables = exportDatabaseTables();
 
-    if (JSON.stringify(tables) !== originalTables) {
-      const updatedDocument = {
-        format: JSON_FORMAT,
-        updatedAt: new Date().toISOString(),
-        tables,
-      };
-      if (useBlobStorage()) {
-        await writeBlobDocument(updatedDocument, etag);
-      } else {
-        writeLocalDocument(updatedDocument);
+        if (JSON.stringify(tables) !== originalTables) {
+          const updatedDocument = {
+            format: JSON_FORMAT,
+            updatedAt: new Date().toISOString(),
+            tables,
+          };
+          if (blobStorage) {
+            await writeBlobDocument(updatedDocument, etag);
+          } else {
+            writeLocalDocument(updatedDocument);
+          }
+        }
+
+        return result;
+      } catch (error) {
+        const isBlobConflict = error instanceof AppError && error.code === 'errors.storage.conflict';
+        if (!blobStorage || !isBlobConflict || attempt + 1 >= MAX_BLOB_WRITE_ATTEMPTS) {
+          throw error;
+        }
+        const backoffMs = Math.min(100 * (2 ** attempt) + Math.floor(Math.random() * 100), 1000);
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      } finally {
+        try {
+          closeDb();
+        } catch (error) {
+          console.error('Failed to close the JSON database after a request.', error);
+        }
       }
     }
-
-    return result;
   } finally {
-    try {
-      closeDb();
-    } finally {
-      release();
-    }
+    release();
   }
 }
