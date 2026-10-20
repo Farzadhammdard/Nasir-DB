@@ -1,10 +1,13 @@
 import { dispatchBusiness, publicApiError } from '@/lib/business';
+import { withJsonStore } from '@/lib/json-store';
+
+export const runtime = 'nodejs';
 
 async function handle(request, context, method) {
   try {
     const { resource = [] } = await context.params;
     const body = ['POST', 'PUT', 'PATCH'].includes(method) ? await request.json().catch(() => ({})) : {};
-    const result = await dispatchBusiness(method, resource, request, body);
+    const result = await withJsonStore(() => dispatchBusiness(method, resource, request, body));
     if (resource.length === 1 && resource[0] === 'backup' && method === 'GET') {
       return new Response(JSON.stringify(result, null, 2), {
         headers: {

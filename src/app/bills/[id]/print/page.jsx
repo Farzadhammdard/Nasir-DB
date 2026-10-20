@@ -5,16 +5,26 @@ import { requirePermission } from '@/lib/auth';
 import { getAppConfig } from '@/lib/settings';
 import { formatMoney as formatMoneyBase } from '@/lib/money';
 import PrintButton from '@/components/PrintButton';
+import { withJsonStore } from '@/lib/json-store';
 
 const printMoney = (minor, options) => formatMoneyBase(minor, { ...options, decimals: 0 });
 
 export default async function BillPrintPage({ params }) {
   const { id } = await params;
-  try { await requirePermission('bills.view'); } catch { redirect('/login'); }
-  const bill = get('SELECT b.*,c.customer_number,c.name AS customer_name,c.phone AS customer_phone FROM bills b JOIN customers c ON c.id=b.customer_id WHERE b.id=? AND b.deleted_at IS NULL',[Number(id)]);
+  try {
+    await withJsonStore(() => requirePermission('bills.view'));
+  } catch {
+    redirect('/login');
+  }
+  const { bill, items, config } = await withJsonStore(() => {
+    const currentBill = get('SELECT b.*,c.customer_number,c.name AS customer_name,c.phone AS customer_phone FROM bills b JOIN customers c ON c.id=b.customer_id WHERE b.id=? AND b.deleted_at IS NULL',[Number(id)]);
+    return {
+      bill: currentBill,
+      items: currentBill ? all('SELECT * FROM bill_items WHERE bill_id=? ORDER BY sort_order,id',[currentBill.id]) : [],
+      config: getAppConfig(),
+    };
+  });
   if (!bill) return <main className="p-8">بل پیدا نشد.</main>;
-  const items = all('SELECT * FROM bill_items WHERE bill_id=? ORDER BY sort_order,id',[bill.id]);
-  const config = getAppConfig();
   const copy = (label) => (
     <section className="invoice-copy" dir="rtl">
       <header className="invoice-head">
