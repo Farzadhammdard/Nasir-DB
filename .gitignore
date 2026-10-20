@@ -1,0 +1,28 @@
+node_modules/
+.next/
+build/
+dist/
+out/
+
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db
+.data/
+
+.env
+.env*.local
+
+.DS_Store
+Thumbs.db
+npm-debug.log*
+
+# Node REPL scratch cells created by the tooling
+.qwen_node_repl_cell_*
+
+# My Skills: begin
+.claude/
+.agents/
+skills-lock.json
+# My Skills: end
