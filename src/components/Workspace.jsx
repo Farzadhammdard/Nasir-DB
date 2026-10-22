@@ -88,6 +88,17 @@ const english = {
   'برای محاسبه مجموع قیمت و تعداد را وارد کنید.': 'Enter quantity and unit price to calculate the total.',
   'ایجاد مشتری جدید': 'Create a new customer', 'اطلاعات بل': 'Bill details',
   'جزئیات خدمات': 'Service details', 'خلاصه پرداخت': 'Payment summary',
+  'مشتری و تاریخ': 'Customer and date', 'قابل پرداخت': 'Amount due',
+  'تسویه کامل': 'Pay in full', 'بدون پرداخت': 'No payment',
+  'ذخیره تغییرات': 'Save changes', 'جمع، تخفیف و پرداخت نهایی': 'Subtotal, discount and final payment',
+  'نام را بنویسید؛ اگر مشتری موجود باشد خودکار شناسایی می‌شود.': 'Type a name; existing customers are matched automatically.',
+  'نام مشتری را بنویسید…': 'Type the customer name…',
+  'نام خدمت را بنویسید؛ قیمت پیش‌فرض خودکار پر می‌شود.': 'Type the service name; its default price fills in automatically.',
+  'شماره بل خودکار ثبت می‌شود': 'Bill number is assigned automatically',
+  'مشتری پس از ثبت بل قابل تغییر نیست.': 'The customer cannot be changed after the bill is saved.',
+  'نام مشتری را بنویسید یا از فهرست انتخاب کنید.': 'Type the customer name or pick one from the list.',
+  'مشتری جدید با این نام ساخته می‌شود.': 'A new customer will be created with this name.',
+  'یادداشت بل': 'Bill note',
   'جست‌وجو': 'Search', 'پوسته تاریک': 'Dark theme', 'پوسته روشن': 'Light theme',
   'بازکردن منو': 'Open menu', 'بستن منو': 'Close menu', 'خروج': 'Log out', 'کاربر': 'User',
   'با موفقیت ذخیره شد.': 'Saved successfully.', 'حذف شد.': 'Deleted successfully.',
@@ -140,8 +151,6 @@ export default function Workspace({ section }) {
   const [mobileNav, setMobileNav] = useState(false);
   const [billDialogOpen, setBillDialogOpen] = useState(false);
   const [editingBillId, setEditingBillId] = useState(null);
-  const [billCustomerMode, setBillCustomerMode] = useState('existing');
-  const [billCustomerId, setBillCustomerId] = useState('');
   const [billDiscount, setBillDiscount] = useState('0');
   const [billPaid, setBillPaid] = useState('0');
   const [customerName, setCustomerName] = useState('');
@@ -342,9 +351,12 @@ export default function Workspace({ section }) {
       }
       if (section === 'bills') {
         setBillItems([{ serviceId: '', serviceName: '', quantity: '1', unitPrice: '' }]);
-        setBillCustomerId('');
+        setCustomerName('');
+        setCustomerPhone('');
+        setBillNote('');
         setBillDiscount('0');
         setBillPaid('0');
+        setEditingBillId(null);
       }
     } catch (submitError) {
       setError(submitError.message);
@@ -443,8 +455,6 @@ export default function Workspace({ section }) {
         const bill = await response.json();
         if (!response.ok) throw new Error(apiMessage(bill));
         setEditingBillId(bill.id);
-        setBillCustomerMode('existing');
-        setBillCustomerId(String(bill.customer_id));
         setCustomerName(bill.customer_name || '');
         setCustomerPhone(bill.customer_phone || '');
         setBillDiscount(String(bill.discount_minor / 100));
@@ -465,8 +475,6 @@ export default function Workspace({ section }) {
     };
     const openBillDialog = () => {
       setEditingBillId(null);
-      setBillCustomerMode(customers.length ? 'existing' : 'new');
-      setBillCustomerId('');
       setCustomerName('');
       setCustomerPhone('');
       setBillDiscount('0');
@@ -475,35 +483,60 @@ export default function Workspace({ section }) {
       setBillItems([{ serviceId: '', serviceName: '', quantity: '1', unitPrice: '' }]);
       setBillDialogOpen(true);
     };
+    const customerQuery = customerName.trim().toLowerCase();
+    const matchedCustomer = customerQuery ? customers.find((customer) => customer.name.trim().toLowerCase() === customerQuery) : null;
+    const customerHint = !customerQuery
+      ? translate('نام مشتری را بنویسید یا از فهرست انتخاب کنید.', language)
+      : matchedCustomer
+        ? `${translate('مشتری موجود', language)} · ${matchedCustomer.customer_number}`
+        : translate('مشتری جدید با این نام ساخته می‌شود.', language);
+    const updateCustomerName = (value) => {
+      const match = customers.find((customer) => customer.name.trim().toLowerCase() === value.trim().toLowerCase());
+      setCustomerName(value);
+      if (match) setCustomerPhone(match.phone || '');
+      else if (customers.some((customer) => (customer.phone || '') === customerPhone)) setCustomerPhone('');
+    };
+    const updateItemService = (index, value) => {
+      const service = services.find((entry) => entry.name.trim().toLowerCase() === value.trim().toLowerCase());
+      setBillItems((items) => items.map((item, row) => row === index ? {
+        ...item,
+        serviceName: value,
+        serviceId: service ? String(service.id) : '',
+        unitPrice: service ? String(service.default_price_minor / 100) : item.unitPrice,
+      } : item));
+    };
+    const changeQuantity = (index, delta) => {
+      setBillItems((items) => items.map((item, row) => {
+        if (row !== index) return item;
+        const next = Math.max(0.01, Math.round(((Number(item.quantity) || 0) + delta) * 100) / 100);
+        return { ...item, quantity: String(next) };
+      }));
+    };
+    const addBillItem = () => setBillItems((items) => [...items, { serviceId: '', serviceName: '', quantity: '1', unitPrice: '' }]);
     return <>
-      <datalist id="customer-name-suggestions">
-        {customers.map((c) => <option key={c.id} value={c.name} />)}
-      </datalist>
-      <datalist id="customer-phone-suggestions">
-        {customers.map((c) => c.phone ? <option key={c.id} value={c.phone} /> : null).filter(Boolean)}
-      </datalist>
-      <datalist id="service-name-suggestions">
-        {services.map((s) => <option key={s.id} value={s.name} />)}
-      </datalist>
-      <datalist id="note-suggestions">
-        <option value="تسویه نقدی" />
-        <option value="تحویل داده شد" />
-        <option value="پیش‌پرداخت" />
-      </datalist>
+      <datalist id="customer-name-suggestions">{customers.map((customer) => <option key={customer.id} value={customer.name} />)}</datalist>
+      <datalist id="customer-phone-suggestions">{customers.filter((customer) => customer.phone).map((customer) => <option key={customer.id} value={customer.phone} />)}</datalist>
+      <datalist id="service-name-suggestions">{services.map((service) => <option key={service.id} value={service.name} />)}</datalist>
       <section className="content-panel">
         <div className="panel-heading"><div><h2>{translate('بل‌های ثبت‌شده', language)}</h2><p>{filtered.length} {language === 'en' ? 'records' : 'مورد'}</p></div><button className={buttonClass} onClick={openBillDialog}><CirclePlus size={16} /> {translate('بل جدید', language)}</button></div>
         {table(['شماره', 'مشتری', 'تاریخ', 'جمع', 'پرداخت', 'باقی', 'عملیات'], filtered, (row) => <tr key={row.id}><td className="mono">{row.bill_number}</td><td>{row.customer_name}</td><td>{row.bill_date}</td><td>{formatMoney(row.grand_total_minor, currency)}</td><td>{formatMoney(row.paid_minor, currency)}</td><td className="amount-due">{formatMoney(row.remaining_minor, currency)}</td><td className="table-actions"><button className="icon-button" title={translate('ویرایش', language)} onClick={() => openEditBill(row.id)}><Pencil size={16} /></button><button className="icon-button" title={translate('چاپ', language)} onClick={() => setPrintBillId(row.id)}><Printer size={16} /></button><button className="icon-button danger-button" title={translate('حذف نرم', language)} onClick={() => remove(`/api/bills/${row.id}`)}><Trash2 size={16} /></button></td></tr>, 'بل')}
       </section>
       {billDialogOpen && typeof document !== 'undefined' && createPortal(<div className="modal-backdrop bill-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setBillDialogOpen(false); }}>
         <section className="content-panel bill-dialog" role="dialog" aria-modal="true" aria-labelledby="bill-dialog-title">
-          <div className="panel-heading bill-dialog-heading">
-            <div><p className="eyebrow">{translate('ثبت سند مالی', language)}</p><h2 id="bill-dialog-title">{editingBillId ? translate('ویرایش بل', language) : translate('بل جدید', language)}</h2></div>
-            <div className="dialog-heading-actions"><span className="live-total">{formatMoney(finalTotal, currency)}</span><button type="button" className="icon-button" onClick={() => setBillDialogOpen(false)} aria-label={translate('بستن', language)}><X size={19} /></button></div>
-          </div>
+          <header className="bill-dialog-header">
+            <div className="bill-dialog-title">
+              <span className="bill-dialog-icon"><FileText size={20} /></span>
+              <div><p className="eyebrow">{translate('ثبت سند مالی', language)}</p><h2 id="bill-dialog-title">{editingBillId ? translate('ویرایش بل', language) : translate('بل جدید', language)}</h2></div>
+            </div>
+            <div className="dialog-heading-actions">
+              <span className="bill-dialog-total"><small>{translate('قابل پرداخت', language)}</small><strong>{formatMoney(finalTotal, currency)}</strong></span>
+              <button type="button" className="icon-button" onClick={() => setBillDialogOpen(false)} aria-label={translate('بستن', language)}><X size={19} /></button>
+            </div>
+          </header>
           <form className="bill-form" onSubmit={(event) => submit(event, editingBillId ? `/api/bills/${editingBillId}` : '/api/bills', editingBillId ? 'PATCH' : 'POST', (form) => ({
-            customerId: billCustomerMode === 'existing' ? billCustomerId : '',
-            customerName,
-            customerPhone,
+            customerId: matchedCustomer ? String(matchedCustomer.id) : '',
+            customerName: customerName.trim(),
+            customerPhone: customerPhone.trim(),
             isPermanent: form.get('isPermanent') === 'on',
             date: form.get('date'),
             discount: billDiscount,
@@ -511,55 +544,95 @@ export default function Workspace({ section }) {
             note: billNote,
             items: billItems,
           }))}>
-            <section className="bill-form-section">
-              <div className="bill-section-title"><strong>{translate('اطلاعات بل', language)}</strong></div>
-              <div className="bill-details-grid">
-                <div className="bill-customer-field">
-                  <div className="bill-customer-switch" role="group" aria-label={translate('نام مشتری', language)}>
-                    <button type="button" className={billCustomerMode === 'existing' ? 'tab-button is-selected' : 'tab-button'} onClick={() => setBillCustomerMode('existing')}>{translate('مشتری موجود', language)}</button>
-                    <button type="button" className={billCustomerMode === 'new' ? 'tab-button is-selected' : 'tab-button'} onClick={() => setBillCustomerMode('new')}>{translate('مشتری جدید', language)}</button>
+            <div className="bill-layout">
+              <div className="bill-main">
+                <section className="bill-card">
+                  <div className="bill-card-head">
+                    <span className="bill-card-icon"><Users size={17} /></span>
+                    <div><strong>{translate('مشتری و تاریخ', language)}</strong><small>{translate('نام را بنویسید؛ اگر مشتری موجود باشد خودکار شناسایی می‌شود.', language)}</small></div>
                   </div>
-                  {billCustomerMode === 'existing'
-                    ? <label className="form-field"><span>{translate('نام مشتری', language)}</span><select className={fieldClass} name="customerId" value={billCustomerId} required onChange={(event) => setBillCustomerId(event.target.value)}><option value="">{translate('انتخاب مشتری', language)}</option>{customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.name} · {customer.customer_number}</option>)}</select></label>
-                    : <div className="bill-new-customer">
-                        <label className="form-field"><span>{translate('نام مشتری جدید', language)}</span><input className={fieldClass} name="customerName" value={customerName} onChange={(event) => setCustomerName(event.target.value)} list="customer-name-suggestions" required placeholder={translate('نام مشتری جدید', language)} /></label>
-                        <label className="form-field"><span>{translate('تلفن مشتری', language)}</span><input className={fieldClass} name="customerPhone" type="tel" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} list="customer-phone-suggestions" placeholder={translate('تلفن مشتری', language)} /></label>
-                        <label className="check-field"><input type="checkbox" name="isPermanent" /> {translate('مشتری دایمی', language)}</label>
-                      </div>}
-                </div>
-                <LocalizedField label="تاریخ" name="date" type="date" required />
-                <label className="form-field bill-sequence-field"><span>{translate('شماره بل', language)}</span><output className="bill-sequence">{translate('خودکار پس از ذخیره', language)}</output></label>
+                  <div className="bill-customer-grid">
+                    <label className="bill-item-field">
+                      <span className="bill-field-label">{translate('نام مشتری', language)}</span>
+                      <input className={fieldClass} name="customerName" value={customerName} onChange={(event) => updateCustomerName(event.target.value)} list="customer-name-suggestions" placeholder={translate('نام مشتری را بنویسید…', language)} required readOnly={Boolean(editingBillId)} />
+                      <small className={matchedCustomer ? 'bill-customer-status is-matched' : 'bill-customer-status'}>{customerHint}</small>
+                    </label>
+                    <label className="bill-item-field">
+                      <span className="bill-field-label">{translate('تلفن مشتری', language)}</span>
+                      <input className={fieldClass} name="customerPhone" type="tel" dir="ltr" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} list="customer-phone-suggestions" placeholder="07xx xxx xxx" readOnly={Boolean(editingBillId)} />
+                    </label>
+                    <LocalizedField label="تاریخ" name="date" type="date" required />
+                  </div>
+                  <div className="bill-customer-foot">
+                    {!editingBillId
+                      ? <label className="check-field"><input type="checkbox" name="isPermanent" defaultChecked /> {translate('مشتری دایمی', language)}</label>
+                      : <small className="bill-customer-locked">{translate('مشتری پس از ثبت بل قابل تغییر نیست.', language)}</small>}
+                    <small className="bill-auto-number">{translate('شماره بل خودکار ثبت می‌شود', language)}</small>
+                  </div>
+                </section>
+                <section className="bill-card">
+                  <div className="bill-card-head">
+                    <span className="bill-card-icon"><CirclePlus size={17} /></span>
+                    <div><strong>{translate('جزئیات خدمات', language)}</strong><small>{translate('نام خدمت را بنویسید؛ قیمت پیش‌فرض خودکار پر می‌شود.', language)}</small></div>
+                    <span className="bill-card-meta">{billItems.length} {language === 'en' ? (billItems.length === 1 ? 'item' : 'items') : 'قلم'}</span>
+                  </div>
+                  <div className="bill-items">
+                    {billItems.map((item, index) => {
+                      const lineTotal = Math.round((Number(item.quantity) || 0) * toMinor(item.unitPrice));
+                      return <div className="bill-item-row" key={index}>
+                        <span className="bill-item-index">{index + 1}</span>
+                        <label className="bill-item-field bill-item-service">
+                          <span className="bill-field-label">{translate('نوعیت خدمات', language)}</span>
+                          <input className={fieldClass} aria-label={translate('نام قلم', language)} value={item.serviceName} onChange={(event) => updateItemService(index, event.target.value)} list="service-name-suggestions" placeholder={translate('نام خدمت', language)} required />
+                        </label>
+                        <label className="bill-item-field">
+                          <span className="bill-field-label">{translate('تعداد / متراژ', language)}</span>
+                          <div className="bill-stepper">
+                            <button type="button" onClick={() => changeQuantity(index, -1)} aria-label="−">−</button>
+                            <input type="number" min="0.01" step="0.01" value={item.quantity} onChange={(event) => setItem(index, 'quantity', event.target.value)} required />
+                            <button type="button" onClick={() => changeQuantity(index, 1)} aria-label="+">+</button>
+                          </div>
+                        </label>
+                        <label className="bill-item-field">
+                          <span className="bill-field-label">{translate('قیمت واحد', language)}</span>
+                          <input className={fieldClass} type="number" min="0" step="0.01" inputMode="decimal" value={item.unitPrice} onChange={(event) => setItem(index, 'unitPrice', event.target.value)} required />
+                        </label>
+                        <div className="bill-item-total">
+                          <span>{translate('مجموع این قلم', language)}</span>
+                          <strong>{formatMoney(lineTotal, currency)}</strong>
+                        </div>
+                        <button type="button" className="icon-button danger-button bill-item-remove" aria-label={translate('حذف قلم', language)} onClick={() => setBillItems((items) => items.filter((_, row) => row !== index))} disabled={billItems.length === 1}><Trash2 size={16} /></button>
+                      </div>;
+                    })}
+                  </div>
+                  <button type="button" className="button-secondary bill-add-item" onClick={addBillItem}><CirclePlus size={16} /> {translate('افزودن قلم', language)}</button>
+                </section>
               </div>
-            </section>
-            <section className="bill-form-section">
-              <div className="bill-section-title"><strong>{translate('جزئیات خدمات', language)}</strong><span>{billItems.length} {language === 'en' ? (billItems.length === 1 ? 'item' : 'items') : 'قلم'}</span></div>
-              <div className="bill-line-headings"><span>{translate('نوعیت خدمات', language)}</span><span>{translate('تعداد / متراژ', language)}</span><span>{translate('قیمت واحد', language)}</span><span>{translate('مجموع این قلم', language)}</span><span aria-hidden="true" /></div>
-              <div className="line-items bill-line-items">{billItems.map((item, index) => {
-                const lineTotal = Math.round((Number(item.quantity) || 0) * toMinor(item.unitPrice));
-                return <div className="line-item bill-line-item" key={index}>
-                  <label className="form-field"><span className="bill-mobile-label">{translate('نوعیت خدمات', language)}</span><select className={fieldClass} value={item.serviceId} onChange={(event) => { const service = services.find((entry) => String(entry.id) === event.target.value); setItem(index, 'serviceId', event.target.value); setItem(index, 'serviceName', service?.name || ''); setItem(index, 'unitPrice', service ? String(service.default_price_minor / 100) : item.unitPrice); }}><option value="">{translate('انتخاب یا نام دلخواه', language)}</option>{services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select><input className={`${fieldClass} bill-service-name`} aria-label={translate('نام قلم', language)} value={item.serviceName} onChange={(event) => setItem(index, 'serviceName', event.target.value)} list="service-name-suggestions" placeholder={translate('نام خدمت', language)} required /></label>
-                  <label className="form-field"><span className="bill-mobile-label">{translate('تعداد / متراژ', language)}</span><input className={fieldClass} type="number" min="0.01" step="0.01" value={item.quantity} onChange={(event) => setItem(index, 'quantity', event.target.value)} required /></label>
-                  <label className="form-field"><span className="bill-mobile-label">{translate('قیمت واحد', language)}</span><input className={fieldClass} type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => setItem(index, 'unitPrice', event.target.value)} required /></label>
-                  <output className="bill-line-total">{formatMoney(lineTotal, currency)}</output>
-                  <button type="button" className="icon-button danger-button bill-remove-item" aria-label={translate('حذف قلم', language)} onClick={() => setBillItems((items) => items.filter((_, row) => row !== index))} disabled={billItems.length === 1}><X size={17} /></button>
-                </div>;
-              })}</div>
-              <button type="button" className="button-secondary bill-add-item" onClick={() => setBillItems((items) => [...items, { serviceId: '', serviceName: '', quantity: '1', unitPrice: '' }])}><CirclePlus size={16} /> {translate('افزودن قلم', language)}</button>
-            </section>
-            <section className="bill-form-section bill-summary-section">
-              <div className="bill-section-title"><strong>{translate('خلاصه پرداخت', language)}</strong></div>
-              <div className="bill-summary-grid">
-                <div className="bill-summary-value"><span>{translate('جمع اقلام', language)}</span><strong>{formatMoney(subtotal, currency)}</strong></div>
-                <label className="form-field bill-summary-input"><span>{translate('تخفیف', language)}</span><input className={fieldClass} name="discount" type="number" min="0" max={(subtotal / 100).toFixed(2)} step="0.01" value={billDiscount} onChange={(event) => setBillDiscount(event.target.value)} /></label>
-                <div className="bill-summary-value bill-summary-total"><span>{translate('جمع بعد از تخفیف', language)}</span><strong>{formatMoney(finalTotal, currency)}</strong></div>
-                <label className="form-field bill-summary-input"><span>{translate('رسید / پرداخت', language)}</span><input className={fieldClass} name="paid" type="number" min="0" max={(finalTotal / 100).toFixed(2)} step="0.01" value={billPaid} onChange={(event) => setBillPaid(event.target.value)} /></label>
-                <div className="bill-summary-value bill-summary-due"><span>{translate('باقی', language)}</span><strong>{formatMoney(remaining, currency)}</strong></div>
-              </div>
-              {!billDraftValid && <p className="bill-validation-message">{discountMinor > subtotal ? translate('تخفیف نمی‌تواند از جمع اقلام بیشتر باشد.', language) : translate('رسید نمی‌تواند از جمع بعد از تخفیف بیشتر باشد.', language)}</p>}
-            </section>
-            <div className="bill-form-footer">
-              <label className="form-field"><span>{translate('یادداشت', language)}</span><input className={fieldClass} name="note" value={billNote} onChange={(event) => setBillNote(event.target.value)} placeholder={translate('یادداشت بل', language)} list="note-suggestions" /></label>
-              <button className={buttonClass} disabled={busy || !billDraftValid}><FileText size={16} /> {translate('ثبت بل', language)}</button>
+              <aside className="bill-side">
+                <section className="bill-card bill-summary-card">
+                  <div className="bill-card-head">
+                    <span className="bill-card-icon"><Banknote size={17} /></span>
+                    <div><strong>{translate('خلاصه پرداخت', language)}</strong><small>{translate('جمع، تخفیف و پرداخت نهایی', language)}</small></div>
+                  </div>
+                  <dl className="bill-summary-list">
+                    <div><dt>{translate('جمع اقلام', language)}</dt><dd>{formatMoney(subtotal, currency)}</dd></div>
+                    <div className="bill-summary-input"><dt><label htmlFor="bill-discount">{translate('تخفیف', language)}</label></dt><dd><input id="bill-discount" className={fieldClass} type="number" min="0" max={(subtotal / 100).toFixed(2)} step="0.01" value={billDiscount} onChange={(event) => setBillDiscount(event.target.value)} /></dd></div>
+                    <div className="bill-summary-grand"><dt>{translate('قابل پرداخت', language)}</dt><dd>{formatMoney(finalTotal, currency)}</dd></div>
+                    <div className="bill-summary-input"><dt><label htmlFor="bill-paid">{translate('رسید / پرداخت', language)}</label></dt><dd><input id="bill-paid" className={fieldClass} type="number" min="0" max={(finalTotal / 100).toFixed(2)} step="0.01" value={billPaid} onChange={(event) => setBillPaid(event.target.value)} /></dd></div>
+                    <div className="bill-summary-remaining"><dt>{translate('باقی', language)}</dt><dd>{formatMoney(remaining, currency)}</dd></div>
+                  </dl>
+                  {!billDraftValid && <p className="bill-validation-message">{discountMinor > subtotal ? translate('تخفیف نمی‌تواند از جمع اقلام بیشتر باشد.', language) : translate('رسید نمی‌تواند از جمع بعد از تخفیف بیشتر باشد.', language)}</p>}
+                  <div className="bill-quick-actions">
+                    <button type="button" onClick={() => setBillPaid((finalTotal / 100).toFixed(2))}>{translate('تسویه کامل', language)}</button>
+                    <button type="button" onClick={() => setBillPaid('0')}>{translate('بدون پرداخت', language)}</button>
+                  </div>
+                  <button className="button-primary bill-submit" disabled={busy || !billDraftValid}><FileText size={16} /> {editingBillId ? translate('ذخیره تغییرات', language) : translate('ثبت بل', language)}</button>
+                </section>
+                <section className="bill-card bill-note-card">
+                  <span className="bill-field-label">{translate('یادداشت', language)}</span>
+                  <textarea className={fieldClass} rows="3" value={billNote} onChange={(event) => setBillNote(event.target.value)} placeholder={translate('یادداشت بل', language)} />
+                </section>
+              </aside>
             </div>
           </form>
         </section>
