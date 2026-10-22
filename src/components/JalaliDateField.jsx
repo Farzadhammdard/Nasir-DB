@@ -32,5 +32,5 @@ export default function JalaliDateField({ label = 'تاریخ', required = false
     setDate({ jalali: value, iso: `${gregorian.gy}-${pad(gregorian.gm)}-${pad(gregorian.gd)}` });
   }
 
-  return <label className="form-field"><span>{label}</span><input className="field-control jalali-date-input" type="text" inputMode="numeric" dir="ltr" value={date.jalali} required={required} aria-invalid={invalid} aria-describedby={invalid ? 'jalali-date-error' : undefined} onChange={(event) => update(event.target.value)} placeholder="۱۴۰۵/۰۷/۲۴"/><input type="hidden" name="date" value={date.iso}/>{invalid&&<small id="jalali-date-error" className="field-error">تاریخ شمسی معتبر وارد کنید.</small>}</label>;
+  return <label className="form-field"><span>{label}</span><input className="field-control jalali-date-input" type="text" inputMode="numeric" dir="ltr" value={date.jalali} required={required} aria-invalid={invalid} aria-describedby={invalid ? 'jalali-date-error' : undefined} onChange={(event) => update(event.target.value)} placeholder="1405/07/24"/><input type="hidden" name="date" value={date.iso}/>{invalid&&<small id="jalali-date-error" className="field-error">تاریخ شمسی معتبر وارد کنید.</small>}</label>;
 }

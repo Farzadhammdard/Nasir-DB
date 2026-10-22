@@ -9,7 +9,7 @@ import { toMinor } from '@/lib/money';
 import {
   Activity, Banknote, Bell, BookOpenCheck, BriefcaseBusiness, ChartNoAxesCombined,
   ChevronLeft, CirclePlus, Download, FileText, Folder, LayoutDashboard, LogOut, Menu,
-  Moon, Printer, Search, Settings, Sun, Trash2, Users, X,
+  Moon, Pencil, Printer, Search, Settings, Sun, Trash2, Users, X,
 } from 'lucide-react';
 
 const navigation = [
@@ -139,10 +139,14 @@ export default function Workspace({ section }) {
   const [loadedSection, setLoadedSection] = useState(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [billDialogOpen, setBillDialogOpen] = useState(false);
+  const [editingBillId, setEditingBillId] = useState(null);
   const [billCustomerMode, setBillCustomerMode] = useState('existing');
   const [billCustomerId, setBillCustomerId] = useState('');
   const [billDiscount, setBillDiscount] = useState('0');
   const [billPaid, setBillPaid] = useState('0');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [billNote, setBillNote] = useState('');
   const [printBillId, setPrintBillId] = useState(null);
   const [language, setLanguage] = useState('fa');
   const [theme, setTheme] = useState('light');
@@ -431,34 +435,80 @@ export default function Workspace({ section }) {
     const remaining = Math.max(0, finalTotal - paidMinor);
     const billDraftValid = discountMinor <= subtotal && paidMinor <= finalTotal;
     const setItem = (index, key, value) => setBillItems((items) => items.map((item, row) => row === index ? { ...item, [key]: value } : item));
+    const openEditBill = async (id) => {
+      setBusy(true);
+      setError('');
+      try {
+        const response = await fetch(`/api/bills/${id}`);
+        const bill = await response.json();
+        if (!response.ok) throw new Error(apiMessage(bill));
+        setEditingBillId(bill.id);
+        setBillCustomerMode('existing');
+        setBillCustomerId(String(bill.customer_id));
+        setCustomerName(bill.customer_name || '');
+        setCustomerPhone(bill.customer_phone || '');
+        setBillDiscount(String(bill.discount_minor / 100));
+        setBillPaid(String(bill.paid_minor / 100));
+        setBillNote(bill.note || '');
+        setBillItems(bill.items.map((item) => ({
+          serviceId: item.service_id ? String(item.service_id) : '',
+          serviceName: item.service_name || '',
+          quantity: String(item.quantity),
+          unitPrice: String(item.unit_price_minor / 100),
+        })));
+        setBillDialogOpen(true);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setBusy(false);
+      }
+    };
     const openBillDialog = () => {
+      setEditingBillId(null);
       setBillCustomerMode(customers.length ? 'existing' : 'new');
       setBillCustomerId('');
+      setCustomerName('');
+      setCustomerPhone('');
       setBillDiscount('0');
       setBillPaid('0');
+      setBillNote('');
       setBillItems([{ serviceId: '', serviceName: '', quantity: '1', unitPrice: '' }]);
       setBillDialogOpen(true);
     };
     return <>
+      <datalist id="customer-name-suggestions">
+        {customers.map((c) => <option key={c.id} value={c.name} />)}
+      </datalist>
+      <datalist id="customer-phone-suggestions">
+        {customers.map((c) => c.phone ? <option key={c.id} value={c.phone} /> : null).filter(Boolean)}
+      </datalist>
+      <datalist id="service-name-suggestions">
+        {services.map((s) => <option key={s.id} value={s.name} />)}
+      </datalist>
+      <datalist id="note-suggestions">
+        <option value="تسویه نقدی" />
+        <option value="تحویل داده شد" />
+        <option value="پیش‌پرداخت" />
+      </datalist>
       <section className="content-panel">
         <div className="panel-heading"><div><h2>{translate('بل‌های ثبت‌شده', language)}</h2><p>{filtered.length} {language === 'en' ? 'records' : 'مورد'}</p></div><button className={buttonClass} onClick={openBillDialog}><CirclePlus size={16} /> {translate('بل جدید', language)}</button></div>
-        {table(['شماره', 'مشتری', 'تاریخ', 'جمع', 'پرداخت', 'باقی', 'عملیات'], filtered, (row) => <tr key={row.id}><td className="mono">{row.bill_number}</td><td>{row.customer_name}</td><td>{row.bill_date}</td><td>{formatMoney(row.grand_total_minor, currency)}</td><td>{formatMoney(row.paid_minor, currency)}</td><td className="amount-due">{formatMoney(row.remaining_minor, currency)}</td><td className="table-actions"><button className="icon-button" title={translate('چاپ', language)} onClick={() => setPrintBillId(row.id)}><Printer size={16} /></button><button className="icon-button danger-button" title={translate('حذف نرم', language)} onClick={() => remove(`/api/bills/${row.id}`)}><Trash2 size={16} /></button></td></tr>, 'بل')}
+        {table(['شماره', 'مشتری', 'تاریخ', 'جمع', 'پرداخت', 'باقی', 'عملیات'], filtered, (row) => <tr key={row.id}><td className="mono">{row.bill_number}</td><td>{row.customer_name}</td><td>{row.bill_date}</td><td>{formatMoney(row.grand_total_minor, currency)}</td><td>{formatMoney(row.paid_minor, currency)}</td><td className="amount-due">{formatMoney(row.remaining_minor, currency)}</td><td className="table-actions"><button className="icon-button" title={translate('ویرایش', language)} onClick={() => openEditBill(row.id)}><Pencil size={16} /></button><button className="icon-button" title={translate('چاپ', language)} onClick={() => setPrintBillId(row.id)}><Printer size={16} /></button><button className="icon-button danger-button" title={translate('حذف نرم', language)} onClick={() => remove(`/api/bills/${row.id}`)}><Trash2 size={16} /></button></td></tr>, 'بل')}
       </section>
       {billDialogOpen && typeof document !== 'undefined' && createPortal(<div className="modal-backdrop bill-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setBillDialogOpen(false); }}>
         <section className="content-panel bill-dialog" role="dialog" aria-modal="true" aria-labelledby="bill-dialog-title">
           <div className="panel-heading bill-dialog-heading">
-            <div><p className="eyebrow">{translate('ثبت سند مالی', language)}</p><h2 id="bill-dialog-title">{translate('بل جدید', language)}</h2></div>
+            <div><p className="eyebrow">{translate('ثبت سند مالی', language)}</p><h2 id="bill-dialog-title">{editingBillId ? translate('ویرایش بل', language) : translate('بل جدید', language)}</h2></div>
             <div className="dialog-heading-actions"><span className="live-total">{formatMoney(finalTotal, currency)}</span><button type="button" className="icon-button" onClick={() => setBillDialogOpen(false)} aria-label={translate('بستن', language)}><X size={19} /></button></div>
           </div>
-          <form className="bill-form" onSubmit={(event) => submit(event, '/api/bills', 'POST', (form) => ({
+          <form className="bill-form" onSubmit={(event) => submit(event, editingBillId ? `/api/bills/${editingBillId}` : '/api/bills', editingBillId ? 'PATCH' : 'POST', (form) => ({
             customerId: billCustomerMode === 'existing' ? billCustomerId : '',
-            customerName: form.get('customerName'),
-            customerPhone: form.get('customerPhone'),
+            customerName,
+            customerPhone,
             isPermanent: form.get('isPermanent') === 'on',
             date: form.get('date'),
             discount: billDiscount,
             paid: billPaid,
-            note: form.get('note'),
+            note: billNote,
             items: billItems,
           }))}>
             <section className="bill-form-section">
@@ -471,7 +521,11 @@ export default function Workspace({ section }) {
                   </div>
                   {billCustomerMode === 'existing'
                     ? <label className="form-field"><span>{translate('نام مشتری', language)}</span><select className={fieldClass} name="customerId" value={billCustomerId} required onChange={(event) => setBillCustomerId(event.target.value)}><option value="">{translate('انتخاب مشتری', language)}</option>{customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.name} · {customer.customer_number}</option>)}</select></label>
-                    : <div className="bill-new-customer"><LocalizedField label="نام مشتری جدید" name="customerName" required /><LocalizedField label="تلفن مشتری" name="customerPhone" type="tel" /><label className="check-field"><input type="checkbox" name="isPermanent" /> {translate('مشتری دایمی', language)}</label></div>}
+                    : <div className="bill-new-customer">
+                        <label className="form-field"><span>{translate('نام مشتری جدید', language)}</span><input className={fieldClass} name="customerName" value={customerName} onChange={(event) => setCustomerName(event.target.value)} list="customer-name-suggestions" required placeholder={translate('نام مشتری جدید', language)} /></label>
+                        <label className="form-field"><span>{translate('تلفن مشتری', language)}</span><input className={fieldClass} name="customerPhone" type="tel" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} list="customer-phone-suggestions" placeholder={translate('تلفن مشتری', language)} /></label>
+                        <label className="check-field"><input type="checkbox" name="isPermanent" /> {translate('مشتری دایمی', language)}</label>
+                      </div>}
                 </div>
                 <LocalizedField label="تاریخ" name="date" type="date" required />
                 <label className="form-field bill-sequence-field"><span>{translate('شماره بل', language)}</span><output className="bill-sequence">{translate('خودکار پس از ذخیره', language)}</output></label>
@@ -483,7 +537,7 @@ export default function Workspace({ section }) {
               <div className="line-items bill-line-items">{billItems.map((item, index) => {
                 const lineTotal = Math.round((Number(item.quantity) || 0) * toMinor(item.unitPrice));
                 return <div className="line-item bill-line-item" key={index}>
-                  <label className="form-field"><span className="bill-mobile-label">{translate('نوعیت خدمات', language)}</span><select className={fieldClass} value={item.serviceId} onChange={(event) => { const service = services.find((entry) => String(entry.id) === event.target.value); setItem(index, 'serviceId', event.target.value); setItem(index, 'serviceName', service?.name || ''); setItem(index, 'unitPrice', service ? String(service.default_price_minor / 100) : item.unitPrice); }}><option value="">{translate('انتخاب یا نام دلخواه', language)}</option>{services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select><input className={`${fieldClass} bill-service-name`} aria-label={translate('نام قلم', language)} value={item.serviceName} onChange={(event) => setItem(index, 'serviceName', event.target.value)} placeholder={translate('نام خدمت', language)} required /></label>
+                  <label className="form-field"><span className="bill-mobile-label">{translate('نوعیت خدمات', language)}</span><select className={fieldClass} value={item.serviceId} onChange={(event) => { const service = services.find((entry) => String(entry.id) === event.target.value); setItem(index, 'serviceId', event.target.value); setItem(index, 'serviceName', service?.name || ''); setItem(index, 'unitPrice', service ? String(service.default_price_minor / 100) : item.unitPrice); }}><option value="">{translate('انتخاب یا نام دلخواه', language)}</option>{services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select><input className={`${fieldClass} bill-service-name`} aria-label={translate('نام قلم', language)} value={item.serviceName} onChange={(event) => setItem(index, 'serviceName', event.target.value)} list="service-name-suggestions" placeholder={translate('نام خدمت', language)} required /></label>
                   <label className="form-field"><span className="bill-mobile-label">{translate('تعداد / متراژ', language)}</span><input className={fieldClass} type="number" min="0.01" step="0.01" value={item.quantity} onChange={(event) => setItem(index, 'quantity', event.target.value)} required /></label>
                   <label className="form-field"><span className="bill-mobile-label">{translate('قیمت واحد', language)}</span><input className={fieldClass} type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => setItem(index, 'unitPrice', event.target.value)} required /></label>
                   <output className="bill-line-total">{formatMoney(lineTotal, currency)}</output>
@@ -504,7 +558,7 @@ export default function Workspace({ section }) {
               {!billDraftValid && <p className="bill-validation-message">{discountMinor > subtotal ? translate('تخفیف نمی‌تواند از جمع اقلام بیشتر باشد.', language) : translate('رسید نمی‌تواند از جمع بعد از تخفیف بیشتر باشد.', language)}</p>}
             </section>
             <div className="bill-form-footer">
-              <LocalizedField label="یادداشت" name="note" />
+              <label className="form-field"><span>{translate('یادداشت', language)}</span><input className={fieldClass} name="note" value={billNote} onChange={(event) => setBillNote(event.target.value)} placeholder={translate('یادداشت بل', language)} list="note-suggestions" /></label>
               <button className={buttonClass} disabled={busy || !billDraftValid}><FileText size={16} /> {translate('ثبت بل', language)}</button>
             </div>
           </form>
@@ -560,7 +614,9 @@ export default function Workspace({ section }) {
     const config = data || {};
     const fields = settingsTab === 'company' ? [['company.name','نام شرکت'],['company.address','آدرس'],['company.phone','تلفن'],['company.email','ایمیل'],['company.website','وب‌سایت'],['company.footer','متن پایین چاپ']] : [['bill.start','شماره شروع بل'],['bill.pad','طول شماره بل'],['customer.prefix','پیشوند مشتری'],['customer.start','شماره شروع مشتری'],['currency.code','واحد پول']];
     const valueFor = (key) => key.startsWith('company.') ? config.company?.[key.slice(8)] || '' : key.startsWith('bill.') ? config.sequences?.bill?.[key.slice(5)] ?? '' : key.startsWith('customer.') ? config.sequences?.customer?.[key.slice(9)] ?? '' : key.startsWith('payment.') ? config.sequences?.payment?.[key.slice(8)] ?? '' : key.startsWith('expense.') ? config.sequences?.expense?.[key.slice(8)] ?? '' : key.startsWith('report.') ? config.sequences?.report?.[key.slice(7)] ?? '' : key === 'currency.code' ? config.currency?.code || 'AFN' : config[key] || '';
-    return <><section className="content-panel"><div className="settings-tabs">{[['company','شرکت'],['numbers','شماره‌گذاری'],['services','خدمات'],['types','انواع مصرف'],['users','کاربران'],['backup','پشتیبان']].map(([key,label])=><button key={key} className={settingsTab===key?'tab-button is-selected':'tab-button'} onClick={()=>setSettingsTab(key)}>{translate(label,language)}</button>)}</div>{['company','numbers'].includes(settingsTab) && <form className="form-grid settings-form" onSubmit={(event)=>submit(event,'/api/settings','PUT',(form)=>Object.fromEntries(form.entries()))}>{fields.map(([key,label])=><LocalizedField key={key} label={label} name={key} defaultValue={valueFor(key)} />)}{settingsTab==='numbers' && <><label className="form-field"><span>{translate('پوسته',language)}</span><select name="theme" className={fieldClass} value={theme} onChange={(event)=>setTheme(event.target.value)}><option value="light">{translate('روشن',language)}</option><option value="dark">{translate('تیره',language)}</option></select></label><label className="form-field"><span>{translate('زبان',language)}</span><select name="language" className={fieldClass} value={language} onChange={(event)=>setLanguage(event.target.value)}><option value="fa">{translate('دری',language)}</option><option value="en">English</option></select></label></>}<button className={buttonClass} disabled={busy}>{language==='en'?'Save settings':'ذخیره تنظیمات'}</button></form>}{settingsTab==='services' && <><form className="inline-form" onSubmit={(event)=>submit(event,'/api/services','POST')}><LocalizedField label="نام خدمت" name="name" required/><LocalizedField label="قیمت پیش‌فرض" name="price" type="number" min="0" step="0.01"/><LocalizedField label="واحد" name="unit"/><button className={buttonClass}>{language==='en'?'Add':'افزودن'}</button></form>{table(['خدمت','قیمت','واحد'],services,(row)=><tr key={row.id}><td>{row.name}</td><td>{formatMoney(row.default_price_minor,currency)}</td><td>{row.unit||'—'}</td></tr>,'خدمت')}</>}{settingsTab==='types' && <><form className="inline-form" onSubmit={(event)=>submit(event,'/api/expense-types','POST')}><LocalizedField label="نوع مصرف جدید" name="name" required/><button className={buttonClass}>{language==='en'?'Add':'افزودن'}</button></form>{table(['نوع مصرف',''],expenseTypes,(row)=><tr key={row.id}><td>{row.name}</td><td><button className="icon-button danger-button" onClick={()=>remove(`/api/expense-types/${row.id}`)}><Trash2 size={16}/></button></td></tr>,'نوع مصرف')}</>}{settingsTab==='users' && <><form className="inline-form" onSubmit={(event)=>submit(event,'/api/users','POST')}><LocalizedField label="نام کاربری" name="username" required/><LocalizedField label="نام کامل" name="fullName"/><LocalizedField label="رمز (حداقل ۶ حرف)" name="password" type="password" required/><button className={buttonClass}>{language==='en'?'Add user':'افزودن کاربر'}</button></form><div className="content-panel user-list-panel"><div className="panel-heading"><div><h2>{language==='en'?'User accounts':'حساب‌های کاربری'}</h2><p>{translate('کاربران ثبت‌شده در سامانه.',language)}</p></div></div>{userRows.map((row)=><div className="user-row" key={row.id}><span className="avatar user-avatar">{(row.full_name||row.username||'م').slice(0,1)}</span><span className="user-identity"><strong>{row.full_name||row.username}</strong><small>{row.username}</small></span><span className={row.is_active?'status-active':'status-disabled'}>{row.is_active?(language==='en'?'Active':'فعال'):(language==='en'?'Inactive':'غیرفعال')}</span><button className="button-secondary" disabled={row.is_owner} onClick={()=>toggleUser(row)}>{row.is_active?(language==='en'?'Deactivate':'غیرفعال‌سازی'):(language==='en'?'Activate':'فعال‌سازی')}</button></div>)}</div></>}{settingsTab==='backup' && <div className="backup-actions"><a href="/api/backup" className="button-primary"><Download size={16}/> {language==='en'?'Create JSON backup':'ایجاد پشتیبان JSON'}</a><label className="button-secondary upload-button">{language==='en'?'Restore from file':'بازیابی از فایل'}<input type="file" accept="application/json,.json" onChange={async(event)=>{const file=event.target.files?.[0];if(!file)return;if(!window.confirm('تمام داده‌های فعلی با نسخه پشتیبان جایگزین شوند؟'))return;try{const payload=JSON.parse(await file.text());const response=await fetch('/api/backup/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const result=await response.json();if(!response.ok)throw new Error(apiMessage(result));setMessage('بازیابی انجام شد.');}catch(e){setError(e.message);}}}/></label></div>}</section></>;
+    return <><section className="content-panel"><div className="settings-tabs">{[['company','شرکت'],['numbers','شماره‌گذاری'],['services','خدمات'],['types','انواع مصرف'],['users','کاربران'],['backup','پشتیبان'],['data','پاک کردن دیتا']].map(([key,label])=><button key={key} className={settingsTab===key?'tab-button is-selected':'tab-button'} onClick={()=>setSettingsTab(key)}>{translate(label,language)}</button>)}</div>{['company','numbers'].includes(settingsTab) && <form className="form-grid settings-form" onSubmit={(event)=>submit(event,'/api/settings','PUT',(form)=>Object.fromEntries(form.entries()))}>{fields.map(([key,label])=><LocalizedField key={key} label={label} name={key} defaultValue={valueFor(key)} />)}{settingsTab==='numbers' && <><label className="form-field"><span>{translate('پوسته',language)}</span><select name="theme" className={fieldClass} value={theme} onChange={(event)=>setTheme(event.target.value)}><option value="light">{translate('روشن',language)}</option><option value="dark">{translate('تیره',language)}</option></select></label><label className="form-field"><span>{translate('زبان',language)}</span><select name="language" className={fieldClass} value={language} onChange={(event)=>setLanguage(event.target.value)}><option value="fa">{translate('دری',language)}</option><option value="en">English</option></select></label></>}<button className={buttonClass} disabled={busy}>{language==='en'?'Save settings':'ذخیره تنظیمات'}</button></form>}{settingsTab==='services' && <><form className="inline-form" onSubmit={(event)=>submit(event,'/api/services','POST')}><LocalizedField label="نام خدمت" name="name" required/><LocalizedField label="قیمت پیش‌فرض" name="price" type="number" min="0" step="0.01"/><LocalizedField label="واحد" name="unit"/><button className={buttonClass}>{language==='en'?'Add':'افزودن'}</button></form>{table(['خدمت','قیمت','واحد'],services,(row)=><tr key={row.id}><td>{row.name}</td><td>{formatMoney(row.default_price_minor,currency)}</td><td>{row.unit||'—'}</td></tr>,'خدمت')}</>}{settingsTab==='types' && <><form className="inline-form" onSubmit={(event)=>submit(event,'/api/expense-types','POST')}><LocalizedField label="نوع مصرف جدید" name="name" required/><button className={buttonClass}>{language==='en'?'Add':'افزودن'}</button></form>{table(['نوع مصرف',''],expenseTypes,(row)=><tr key={row.id}><td>{row.name}</td><td><button className="icon-button danger-button" onClick={()=>remove(`/api/expense-types/${row.id}`)}><Trash2 size={16}/></button></td></tr>,'نوع مصرف')}</>}{settingsTab==='users' && <><form className="inline-form" onSubmit={(event)=>submit(event,'/api/users','POST')}><LocalizedField label="نام کاربری" name="username" required/><LocalizedField label="نام کامل" name="fullName"/><LocalizedField label="رمز (حداقل ۶ حرف)" name="password" type="password" required/><button className={buttonClass}>{language==='en'?'Add user':'افزودن کاربر'}</button></form><div className="content-panel user-list-panel"><div className="panel-heading"><div><h2>{language==='en'?'User accounts':'حساب‌های کاربری'}</h2><p>{translate('کاربران ثبت‌شده در سامانه.',language)}</p></div></div>{userRows.map((row)=><div className="user-row" key={row.id}><span className="avatar user-avatar">{(row.full_name||row.username||'م').slice(0,1)}</span><span className="user-identity"><strong>{row.full_name||row.username}</strong><small>{row.username}</small></span><span className={row.is_active?'status-active':'status-disabled'}>{row.is_active?(language==='en'?'Active':'فعال'):(language==='en'?'Inactive':'غیرفعال')}</span><button className="button-secondary" disabled={row.is_owner} onClick={()=>toggleUser(row)}>{row.is_active?(language==='en'?'Deactivate':'غیرفعال‌سازی'):(language==='en'?'Activate':'فعال‌سازی')}</button></div>)}</div></>}{settingsTab==='backup' && <div className="backup-actions"><a href="/api/backup" className="button-primary"><Download size={16}/> {language==='en'?'Create JSON backup':'ایجاد پشتیبان JSON'}</a><label className="button-secondary upload-button">{language==='en'?'Restore from file':'بازیابی از فایل'}<input type="file" accept="application/json,.json" onChange={async(event)=>{const file=event.target.files?.[0];if(!file)return;if(!window.confirm('تمام داده‌های فعلی با نسخه پشتیبان جایگزین شوند؟'))return;try{const payload=JSON.parse(await file.text());const response=await fetch('/api/backup/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const result=await response.json();if(!response.ok)throw new Error(apiMessage(result));setMessage('بازیابی انجام شد.');}catch(e){setError(e.message);}}}/></label></div>}
+{settingsTab === 'data' && <div style={{display:'grid',gap:'14px',maxWidth:'560px'}}><div style={{padding:'20px',border:'1px solid #f1d0ca',borderRadius:'12px',background:'#fff4f1',color:'#913e36'}}><h3 style={{margin:'0 0 6px',fontSize:'15px'}}>{translate('پاک کردن همه اطلاعات', language)}</h3><p style={{margin:'0 0 16px',fontSize:'12px',lineHeight:'1.6'}}>{translate('با کلیک روی این دکمه، تمام اطلاعات ثبت‌شده شامل مشتریان، بل‌ها، پرداخت‌ها، مصارف، خدمات و گزارش‌ها به طور کامل از سیستم پاک خواهند شد. این عملیات غیرقابل برگشت است.', language)}</p><button className="button-primary danger-button" style={{background:'#b93838',borderColor:'#b93838'}} onClick={async()=>{if(!window.confirm(translate('آیا مطمئن هستید؟ همه اطلاعات سیستم پاک خواهد شد!',language)))return;setBusy(true);setError('');try{const response=await fetch('/api/settings/clear',{method:'POST'});const res=await response.json();if(!response.ok)throw new Error(res.error||'پاکسازی انجام نشد.');setMessage('همه دیتا با موفقیت پاک شد.');await load();}catch(err){setError(err.message);}finally{setBusy(false);}}} disabled={busy}>{translate('پاک کردن همه دیتا', language)}</button></div></div>}
+</section></>;
   }
 
   function reportsView() {

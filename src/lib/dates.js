@@ -38,9 +38,7 @@ export function normalizeLocale(locale) {
 }
 
 export function localizeDigits(input, locale) {
-  const text = String(input);
-  if (locale === 'en') return text.replace(/[Û°-Û¹Ù -Ù©]/g, (d) => String('Û°Û±Û²Û³Û´ÛµÛ¶Û·Û¸Û¹Ù Ù¡Ù¢Ù£Ù¤Ù¥Ù¦Ù§Ù¨Ù©'.indexOf(d) % 10));
-  return text.replace(/[0-9]/g, (d) => EASTERN_DIGITS[Number(d)]);
+  return String(input);
 }
 
 export function nowIso() {

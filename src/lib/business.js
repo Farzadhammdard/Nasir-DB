@@ -245,12 +245,35 @@ function restoreBackup(payload, user) {
   return { restored: true };
 }
 
+function clearAllData(user) {
+  tx(() => {
+    run('DELETE FROM bill_items');
+    run('DELETE FROM bills');
+    run('DELETE FROM payments');
+    run('DELETE FROM expenses');
+    run('DELETE FROM customers');
+    run('DELETE FROM services');
+    run('DELETE FROM expense_types');
+    run('DELETE FROM weekly_reports');
+    run('DELETE FROM notifications');
+    run('DELETE FROM audit_logs');
+    run('DELETE FROM backups');
+    run('DELETE FROM counters');
+  });
+  audit(user, 'cleared', 'database', '', 'All application data wiped');
+  return { success: true };
+}
+
 export async function dispatchBusiness(method, parts, request, body = {}) {
   const [resource, idPart, action] = parts;
   if (!resource) fail('مسیر API پیدا نشد.', 'unknown', 404);
   if (resource === 'backup' && method === 'POST' && idPart === 'restore') {
     const user = await requirePermission('backup.restore');
     return restoreBackup(body, user);
+  }
+  if (resource === 'settings' && method === 'POST' && idPart === 'clear') {
+    const user = await requirePermission('settings.manage');
+    return clearAllData(user);
   }
   const permission =
     resource === 'bills' && method === 'POST' ? 'bills.create' :

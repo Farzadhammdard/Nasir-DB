@@ -61,7 +61,7 @@ export default function LoginPanel() {
     <button className="language-toggle login-language-toggle" onClick={() => changeLanguage(language === 'en' ? 'fa' : 'en')}>{language === 'en' ? 'دری' : 'EN'}</button>
     <aside className="login-aside"><span className="brand-mark"><KeyRound size={21}/></span><div><h1>{text('حساب‌های روشن، تصمیم‌های بهتر.', 'Clear accounts. Better decisions.')}</h1><p>{text('مدیریت بل، مشتری و جریان مالی شرکت در یک فضای امن و محلی.', 'Manage bills, customers, and company finances in one secure workspace.')}</p></div><small>{text('سامانه مدیریت شرکت', 'Company management')}</small></aside>
     <section className="login-main"><div className="login-card"><h2>{mode === 'setup' ? text('راه‌اندازی شرکت', 'Set up your company') : text('خوش آمدید', 'Welcome back')}</h2><p>{mode === 'setup' ? text('اطلاعات اولیه شرکت و مدیر را ثبت کنید.', 'Enter the initial company and administrator details.') : text('برای ادامه وارد حساب خود شوید.', 'Sign in to continue.')}</p>
-      {loadingSetup ? <p>{text('در حال بررسی...', 'Checking...')}</p> : <form onSubmit={submit}>
+      {loadingSetup ? <div className="initial-loading"><span className="loading-spinner"></span>{text('در حال بررسی...', 'Checking...')}</div> : <form onSubmit={submit}>
         {!init && <>
           <label className="form-field"><span>{text('نام شرکت', 'Company name')}</span><input className="field-control" name="companyName" required placeholder={text('نام شرکت شما', 'Your company name')}/></label>
           <label className="form-field"><span>{text('نام مدیر', 'Administrator name')}</span><input className="field-control" name="fullName" placeholder={text('نام و نام خانوادگی', 'Full name')}/></label>
