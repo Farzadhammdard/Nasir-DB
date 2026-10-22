@@ -7,8 +7,8 @@ import { useRouter } from 'next/navigation';
 import JalaliDateField from '@/components/JalaliDateField';
 import { toMinor } from '@/lib/money';
 import {
-  Activity, Banknote, Bell, BookOpenCheck, BriefcaseBusiness, ChartNoAxesCombined,
-  ChevronLeft, CirclePlus, Download, FileText, Folder, LayoutDashboard, LogOut, Menu,
+  Activity, Banknote, Bell, BellRing, BookOpenCheck, BriefcaseBusiness, ChartNoAxesCombined,
+  ChevronLeft, CircleAlert, CircleCheck, CirclePlus, Download, FileText, Folder, LayoutDashboard, LogOut, Menu,
   Moon, Pencil, Printer, Search, Settings, Sun, Trash2, Users, X,
 } from 'lucide-react';
 
@@ -99,6 +99,7 @@ const english = {
   'نام مشتری را بنویسید یا از فهرست انتخاب کنید.': 'Type the customer name or pick one from the list.',
   'مشتری جدید با این نام ساخته می‌شود.': 'A new customer will be created with this name.',
   'یادداشت بل': 'Bill note',
+  'خوانده‌نشده': 'unread', 'همه': 'All',
   'جست‌وجو': 'Search', 'پوسته تاریک': 'Dark theme', 'پوسته روشن': 'Light theme',
   'بازکردن منو': 'Open menu', 'بستن منو': 'Close menu', 'خروج': 'Log out', 'کاربر': 'User',
   'با موفقیت ذخیره شد.': 'Saved successfully.', 'حذف شد.': 'Deleted successfully.',
@@ -145,6 +146,7 @@ export default function Workspace({ section }) {
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [siteNotifications, setSiteNotifications] = useState([]);
   const [busy, setBusy] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [loadedSection, setLoadedSection] = useState(null);
@@ -256,6 +258,23 @@ export default function Workspace({ section }) {
     const timeout = window.setTimeout(() => { setMessage(''); setError(''); }, 4200);
     return () => window.clearTimeout(timeout);
   }, [message, error]);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/notifications')
+      .then((response) => response.ok ? response.json() : [])
+      .then((list) => { if (active && Array.isArray(list)) setSiteNotifications(list.filter((item) => !item.is_read)); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  async function markNotificationRead(id) {
+    const response = await fetch(`/api/notifications/${id}`, { method: 'PATCH' });
+    if (!response.ok) { setError('اعلان به‌روزرسانی نشد.'); return; }
+    setSiteNotifications((list) => list.filter((item) => item.id !== id));
+    setMessage('وضعیت اعلان تغییر کرد.');
+    await load();
+  }
 
   useEffect(() => {
     if (!user || (!user.permissions?.includes('*') && !user.permissions?.includes('backup.create'))) return undefined;
@@ -704,7 +723,7 @@ export default function Workspace({ section }) {
   }
 
   function notificationsView() {
-    return <section className="content-panel"><div className="panel-heading"><div><h2>{translate('مرکز اعلان‌ها',language)}</h2><p>{translate('یادآوری باقی‌داری و رخدادهای مالی',language)}</p></div></div>{table(['عنوان','جزئیات','تاریخ','وضعیت'],filtered,(row)=><tr key={row.id} className={row.is_read?'':'unread-row'}><td>{row.title}</td><td className="preline">{row.body}</td><td>{row.created_at?.slice(0,10)}</td><td><button className="button-secondary" onClick={async()=>{const response=await fetch(`/api/notifications/${row.id}`,{method:'PATCH'});if(!response.ok){setError('اعلان به‌روزرسانی نشد.');return;}setMessage('وضعیت اعلان تغییر کرد.');await load();}}>{row.is_read?translate('خوانده‌شده',language):translate('علامت‌گذاری',language)}</button></td></tr>,'اعلان')}</section>;
+    return <section className="content-panel"><div className="panel-heading"><div><h2>{translate('مرکز اعلان‌ها',language)}</h2><p>{translate('یادآوری باقی‌داری و رخدادهای مالی',language)}</p></div></div>{table(['عنوان','جزئیات','تاریخ','وضعیت'],filtered,(row)=><tr key={row.id} className={row.is_read?'':'unread-row'}><td>{row.title}</td><td className="preline">{row.body}</td><td>{row.created_at?.slice(0,10)}</td><td><button className="button-secondary" onClick={() => markNotificationRead(row.id)}>{row.is_read?translate('خوانده‌شده',language):translate('علامت‌گذاری',language)}</button></td></tr>,'اعلان')}</section>;
   }
 
   let content;
@@ -720,5 +739,5 @@ export default function Workspace({ section }) {
 
   const isInitialLoading = pageLoading || loadedSection !== section;
 
-  return <div className="app-shell"><aside className="sidebar">{nav}</aside>{mobileNav&&<div className="mobile-nav-backdrop" onClick={() => setMobileNav(false)}><aside className="sidebar mobile-sidebar" onClick={(event) => event.stopPropagation()}><button className="icon-button close-menu" onClick={() => setMobileNav(false)} aria-label={translate('بستن منو', language)}><X size={18}/></button>{nav}</aside></div>}<main className="main-area">{header}{busy && <div className="loading-line" aria-hidden="true" />}<div className="page-content" aria-busy={isInitialLoading}>{isInitialLoading ? <div className="initial-loading" role="status"><span className="loading-spinner" aria-hidden="true" /><span>{language === 'en' ? 'Loading…' : 'در حال بارگذاری…'}</span></div> : content}</div></main>{(error||message)&&<div className={`toast ${error?'toast-error':'toast-success'}`} role={error?'alert':'status'}>{translate(error || message, language)}</div>}{printBillId&&typeof document!=='undefined'&&createPortal(<div className="modal-backdrop print-dialog-backdrop" onMouseDown={(event)=>{if(event.target===event.currentTarget)setPrintBillId(null);}}><section className="print-dialog" role="dialog" aria-modal="true" aria-label={translate('پیش‌نمایش چاپ بل', language)}><div className="print-dialog-header"><strong>{translate('پیش‌نمایش چاپ بل', language)}</strong><button className="icon-button" onClick={()=>setPrintBillId(null)} aria-label={translate('بستن', language)}><X size={19}/></button></div><iframe title={translate('پیش‌نمایش چاپ بل', language)} src={`/bills/${printBillId}/print`} /></section></div>,document.body)}</div>;
+  return <div className="app-shell"><aside className="sidebar">{nav}</aside>{mobileNav&&<div className="mobile-nav-backdrop" onClick={() => setMobileNav(false)}><aside className="sidebar mobile-sidebar" onClick={(event) => event.stopPropagation()}><button className="icon-button close-menu" onClick={() => setMobileNav(false)} aria-label={translate('بستن منو', language)}><X size={18}/></button>{nav}</aside></div>}<main className="main-area">{header}{busy && <div className="loading-line" aria-hidden="true" />}<div className="page-content" aria-busy={isInitialLoading}>{isInitialLoading ? <div className="initial-loading" role="status"><span className="loading-spinner" aria-hidden="true" /><span>{language === 'en' ? 'Loading…' : 'در حال بارگذاری…'}</span></div> : content}</div></main>{(error||message)&&<aside className={`notice-toast ${error?'is-error':'is-success'}`} role={error?'alert':'status'}><span className="notice-toast-icon">{error?<CircleAlert size={19}/>:<CircleCheck size={19}/>}</span><div className="notice-toast-body"><strong>{error?(language==='en'?'Something went wrong':'خطا'):(language==='en'?'Done':'انجام شد')}</strong><span>{translate(error || message, language)}</span></div><button type="button" className="notice-toast-close" onClick={() => { setError(''); setMessage(''); }} aria-label={translate('بستن', language)}><X size={16}/></button><i className="notice-toast-progress" aria-hidden="true" /></aside>}{section !== 'notifications' && siteNotifications.length > 0 && <aside className="notification-dock" aria-label={translate('اعلان‌ها', language)}><div className="notification-dock-head"><span className="notification-dock-icon"><BellRing size={17}/></span><div><strong>{translate('اعلان‌ها', language)}</strong><small>{siteNotifications.length} {language==='en'?'unread':'خوانده‌نشده'}</small></div><Link href="/notifications" className="notification-dock-link">{language==='en'?'View all':'همه'}</Link></div><div className="notification-dock-list">{siteNotifications.slice(0,3).map((item) => <article className="notification-card" key={item.id}><span className="notification-card-icon"><Bell size={15}/></span><div className="notification-card-body"><strong>{item.title}</strong><p>{item.body}</p><small>{item.created_at?.slice(0,10)}</small></div><div className="notification-card-actions"><button type="button" className="notification-card-button is-read" onClick={() => markNotificationRead(item.id)} aria-label={translate('علامت‌گذاری', language)}><CircleCheck size={15}/></button><button type="button" className="notification-card-button" onClick={() => setSiteNotifications((list) => list.filter((entry) => entry.id !== item.id))} aria-label={translate('بستن', language)}><X size={14}/></button></div></article>)}</div></aside>}{printBillId&&typeof document!=='undefined'&&createPortal(<div className="modal-backdrop print-dialog-backdrop" onMouseDown={(event)=>{if(event.target===event.currentTarget)setPrintBillId(null);}}><section className="print-dialog" role="dialog" aria-modal="true" aria-label={translate('پیش‌نمایش چاپ بل', language)}><div className="print-dialog-header"><strong>{translate('پیش‌نمایش چاپ بل', language)}</strong><button className="icon-button" onClick={()=>setPrintBillId(null)} aria-label={translate('بستن', language)}><X size={19}/></button></div><iframe title={translate('پیش‌نمایش چاپ بل', language)} src={`/bills/${printBillId}/print`} /></section></div>,document.body)}</div>;
 }
