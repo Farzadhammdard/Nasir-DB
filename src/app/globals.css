@@ -138,7 +138,6 @@ tbody tr:hover { background: #f8fbf9; }
 .login-card .button-primary { width: 100%; margin-top: 6px; min-height: 44px; font-size: 13px; font-weight: 700; border-radius: 10px; }
 
 .print-page { color: #111; background: #e9edea; }
-.print-toolbar { display: flex; justify-content: center; gap: 10px; padding: 14px; }
 .print-sheet { width: 210mm; min-height: 297mm; margin: 0 auto 25px; padding: 11mm; background: white; box-shadow: 0 4px 25px #16261c24; }
 .invoice-copy { min-height: 132mm; padding: 3mm 2mm; }
 .invoice-copy h1 { margin: 0; font-size: 18pt; }
@@ -261,7 +260,6 @@ html[data-theme="dark"] .welcome-strip { border-color: #3c5b49; background: line
 @page { size: A4 portrait; margin: 0; }
 @media print {
   html, body { width: 210mm; min-height: 297mm; background: white; }
-  .print-toolbar { display: none; }
   .print-sheet { width: 210mm; min-height: 297mm; margin: 0; padding: 10mm; box-shadow: none; }
   .invoice-copy { min-height: 136mm; break-inside: avoid; }
   .cut-line { height: 8mm; }
@@ -422,9 +420,6 @@ tbody tr:hover { background: rgb(229 245 254 / 65%); }
 .bill-submit { width: 100%; min-height: 46px; margin-top: 12px; font-size: 13px; }
 .bill-note-card { display: grid; gap: 7px; padding: 15px 18px; }
 .bill-note-card .field-control { height: auto; min-height: 76px; padding: 9px 11px; line-height: 1.6; resize: vertical; }
-.print-dialog { display: grid; width: min(1050px, 100%); height: min(92vh, 980px); min-height: 0; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid rgb(255 255 255 / 55%); border-radius: 17px; background: #f5f8fb; box-shadow: 0 30px 100px rgb(7 27 48 / 36%); }
-.print-dialog-header { display: flex; min-height: 48px; align-items: center; justify-content: space-between; padding: 6px 14px; border-bottom: 1px solid rgb(130 160 191 / 18%); color: var(--ink); background: rgb(248 251 255 / 94%); }
-.print-dialog iframe { display: block; width: 100%; height: 100%; min-height: 0; border: 0; background: #e9eff5; }
 .toast { position: fixed; inset-inline-start: 50%; inset-block-end: 22px; z-index: 120; max-width: min(560px, calc(100vw - 28px)); padding: 13px 19px; border: 1px solid rgb(255 255 255 / 65%); border-radius: 13px; box-shadow: 0 14px 44px rgb(20 44 72 / 20%); backdrop-filter: blur(16px); animation: toast-enter .24s ease both; font-size: 13px; }
 .toast-success { color: #165b41; background: rgb(226 250 237 / 94%); }
 .toast-error { color: #8e3834; background: rgb(255 237 234 / 96%); }
@@ -443,7 +438,7 @@ html[data-theme="dark"] .metric-2 { background: linear-gradient(135deg, rgb(20 3
 html[data-theme="dark"] .metric-3 { background: linear-gradient(135deg, rgb(20 38 56 / 88%), rgb(16 52 40 / 75%)); }
 html[data-theme="dark"] .metric-4 { background: linear-gradient(135deg, rgb(20 38 56 / 88%), rgb(64 26 26 / 75%)); }
 html[data-theme="dark"] .search-box, html[data-theme="dark"] .field-control, html[data-theme="dark"] .button-secondary, html[data-theme="dark"] .language-toggle { border-color: var(--line); color: var(--ink); background: rgb(13 28 43 / 82%); }
-html[data-theme="dark"] .search-results, html[data-theme="dark"] .bill-dialog, html[data-theme="dark"] .print-dialog { border-color: var(--line); background: rgb(18 33 48 / 97%); }
+html[data-theme="dark"] .search-results, html[data-theme="dark"] .bill-dialog { border-color: var(--line); background: rgb(18 33 48 / 97%); }
 html[data-theme="dark"] .bill-dialog { background: linear-gradient(160deg, rgb(20 36 52 / 98%), rgb(13 27 41 / 98%)); }
 html[data-theme="dark"] .bill-dialog-header { border-color: var(--line); background: rgb(20 36 52 / 92%); }
 html[data-theme="dark"] .bill-card { border-color: var(--line); background: rgb(20 36 52 / 72%); }
@@ -497,7 +492,6 @@ html[data-theme="dark"] td, html[data-theme="dark"] .user-row { border-color: va
   .bill-layout, .bill-main { gap: 12px; }
   .bill-customer-grid { grid-template-columns: 1fr; }
   .bill-customer-foot { align-items: flex-start; flex-direction: column; gap: 7px; }
-  .print-dialog { height: 94vh; }
 }
 @media (max-width: 430px) {
   .bill-dialog-total { display: none; }
@@ -507,8 +501,6 @@ html[data-theme="dark"] td, html[data-theme="dark"] .user-row { border-color: va
 }
 @media screen and (max-width: 800px) {
   .print-page { width: 100%; min-height: 100%; padding: 0 12px 12px; background: #e9eff5; }
-  .print-toolbar { position: sticky; top: 0; z-index: 2; margin: 0 -12px 12px; padding: 8px 12px; border-bottom: 1px solid rgb(130 160 191 / 20%); background: rgb(239 245 250 / 94%); backdrop-filter: blur(12px); }
-  .print-toolbar .button-primary, .print-toolbar .button-secondary { min-height: 36px; padding-inline: 11px; }
   .print-sheet { width: 100%; min-height: 0; margin: 0 auto 12px; padding: clamp(14px, 3vw, 24px); border-radius: 3px; box-shadow: 0 5px 22px rgb(21 47 70 / 12%); }
   .invoice-copy { min-height: 0; padding: 12px 4px 16px; }
   .invoice-head { gap: 12px; }
@@ -521,7 +513,6 @@ html[data-theme="dark"] td, html[data-theme="dark"] .user-row { border-color: va
 }
 @media screen and (max-width: 430px) {
   .print-page { padding-inline: 7px; }
-  .print-toolbar { margin-inline: -7px; padding-inline: 7px; }
   .print-sheet { padding: 12px; }
   .invoice-copy { padding-inline: 0; }
   .invoice-copy h1 { font-size: 15pt; }
@@ -538,7 +529,6 @@ html[data-theme="dark"] td, html[data-theme="dark"] .user-row { border-color: va
   @page { size: A4; margin: 0; }
   html, body { width: 210mm; min-height: 0; margin: 0; padding: 0; background: white; }
   .print-page { width: 210mm; min-height: 0; margin: 0; padding: 0; background: white; }
-  .print-toolbar { display: none; }
   .print-sheet { box-sizing: border-box; width: 210mm; min-height: 0; height: 297mm; margin: 0; padding: 5mm; box-shadow: none; }
   .invoice-copy { min-height: 0; height: auto; padding: 1mm .5mm; }
   .invoice-copy table { font-size: 8pt; line-height: 1.15; }
@@ -549,14 +539,14 @@ html[data-theme="dark"] td, html[data-theme="dark"] .user-row { border-color: va
 }
 /* ── Animated gradient metric borders ─────────────────────────── */
 @property --metric-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-.metric { --metric-a: #22a9e5; --metric-b: #9be8ff; position: relative; overflow: hidden; border-color: transparent; }
-.metric::before { position: absolute; inset: 0; padding: 1.6px; border-radius: inherit; background: conic-gradient(from var(--metric-angle), var(--metric-a), var(--metric-b), var(--metric-a)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; content: ''; pointer-events: none; animation: metric-border-spin 5.5s linear infinite; }
+.metric { --metric-a: #22a9e5; --metric-b: #9be8ff; --metric-c: #8b5cf6; position: relative; overflow: hidden; border-color: transparent; }
+.metric::before { position: absolute; inset: 0; padding: 2px; border-radius: inherit; background: conic-gradient(from var(--metric-angle), var(--metric-a), var(--metric-b), var(--metric-c), var(--metric-a)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; content: ''; pointer-events: none; animation: metric-border-spin 4.2s linear infinite; }
 .metric::after { position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(150px 90px at 88% 0%, var(--metric-a), transparent 72%); opacity: .12; content: ''; pointer-events: none; }
 .metric > * { position: relative; z-index: 1; }
-.metric-1 { --metric-a: #22a9e5; --metric-b: #a5e8ff; }
-.metric-2 { --metric-a: #e3a746; --metric-b: #ffe0a3; }
-.metric-3 { --metric-a: #1fbf8a; --metric-b: #b8f7dd; }
-.metric-4 { --metric-a: #ef6a7a; --metric-b: #ffc4cc; }
+.metric-1 { --metric-a: #22a9e5; --metric-b: #a5e8ff; --metric-c: #6d5ef5; }
+.metric-2 { --metric-a: #e3a746; --metric-b: #ffe0a3; --metric-c: #f97316; }
+.metric-3 { --metric-a: #1fbf8a; --metric-b: #b8f7dd; --metric-c: #06b6d4; }
+.metric-4 { --metric-a: #ef6a7a; --metric-b: #ffc4cc; --metric-c: #f59e0b; }
 .metric:hover { border-color: transparent; box-shadow: 0 22px 55px rgb(14 116 144 / 16%), 0 0 0 1px rgb(14 165 233 / 14%), inset 0 1px 0 rgb(255 255 255 / 100%); }
 html[data-theme="dark"] .metric { border-color: transparent; }
 @keyframes metric-border-spin { to { --metric-angle: 360deg; } }

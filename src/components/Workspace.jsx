@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -66,7 +66,7 @@ const english = {
   'برای این بازه گزارشی ثبت نشده است.': 'No reports were found for this date range.',
   'مرکز اعلان‌ها': 'Notification center', 'یادآوری باقی‌داری و رخدادهای مالی': 'Balance reminders and financial activity',
   'کاربران ثبت‌شده در سامانه.': 'Users registered in this system.',
-  'ثبت پرداخت': 'Record payment', 'پیش‌نمایش و چاپ بل': 'Bill preview and print',
+  'ثبت پرداخت': 'Record payment',
   'پشتیبان روزانه با موفقیت ایجاد شد.': 'Daily backup completed successfully.',
   'پوسته': 'Theme', 'محاسبه مجدد': 'Recalculate', 'ویرایش': 'Edit',
   'حذف گزارش': 'Delete report', 'عنوان': 'Title', 'خوانده‌شده': 'Read',
@@ -105,7 +105,7 @@ const english = {
   'با موفقیت ذخیره شد.': 'Saved successfully.', 'حذف شد.': 'Deleted successfully.',
   'ورود موفقیت‌آمیز بود.': 'Signed in successfully.', 'حساب کاربر غیرفعال شد.': 'User account deactivated.',
   'حساب کاربر فعال شد.': 'User account activated.', 'پشتیبان روزانه ایجاد نشد': 'Daily backup failed',
-  'پیش‌نمایش چاپ بل': 'Bill print preview', 'گزارش به‌روزرسانی شد.': 'Report updated.',
+  'گزارش به‌روزرسانی شد.': 'Report updated.',
   'وضعیت اعلان تغییر کرد.': 'Notification status updated.', 'اعلان به‌روزرسانی نشد.': 'Notification was not updated.',
 };
 const navPermissions = { dashboard: 'dashboard.view', bills: 'bills.view', customers: 'customers.view', dues: 'customers.view', expenses: 'expenses.view', reports: 'reports.view', settings: 'settings.manage' };
@@ -158,7 +158,6 @@ export default function Workspace({ section }) {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [billNote, setBillNote] = useState('');
-  const [printBillId, setPrintBillId] = useState(null);
   const [language, setLanguage] = useState('fa');
   const [theme, setTheme] = useState('light');
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
@@ -170,6 +169,7 @@ export default function Workspace({ section }) {
   const [billItems, setBillItems] = useState([{ serviceId: '', serviceName: '', quantity: '1', unitPrice: '' }]);
   const [settingsTab, setSettingsTab] = useState('company');
   const [userRows, setUserRows] = useState([]);
+  const printFrameRef = useRef(null);
   const currency = data?.currency?.code || 'AFN';
   const resource = section === 'dashboard' ? 'dashboard' : section;
   const LocalizedField = ({ label, ...props }) => <Field {...props} label={translate(label, language)} />;
@@ -393,6 +393,26 @@ export default function Workspace({ section }) {
     else { setMessage('حذف شد.'); await load(); }
   }
 
+  function printBill(id) {
+    printFrameRef.current?.remove();
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.tabIndex = -1;
+    frame.style.cssText = 'position:fixed;top:0;left:-10000px;width:1024px;height:768px;border:0;';
+    frame.src = `/bills/${id}/print`;
+    frame.addEventListener('load', () => {
+      try {
+        frame.contentWindow.addEventListener('afterprint', () => frame.remove(), { once: true });
+      } catch {
+        window.setTimeout(() => frame.remove(), 300000);
+      }
+    });
+    document.body.appendChild(frame);
+    printFrameRef.current = frame;
+  }
+
+  useEffect(() => () => { printFrameRef.current?.remove(); }, []);
+
   async function reportAction(id, action, method = 'POST', body = {}) {
     const response = await fetch(`/api/reports/${id}${action ? `/${action}` : ''}`, { method, headers: { 'Content-Type': 'application/json' }, body: method === 'POST' || method === 'PATCH' ? JSON.stringify(body) : undefined });
     const result = await response.json();
@@ -538,7 +558,7 @@ export default function Workspace({ section }) {
       <datalist id="service-name-suggestions">{services.map((service) => <option key={service.id} value={service.name} />)}</datalist>
       <section className="content-panel">
         <div className="panel-heading"><div><h2>{translate('بل‌های ثبت‌شده', language)}</h2><p>{filtered.length} {language === 'en' ? 'records' : 'مورد'}</p></div><button className={buttonClass} onClick={openBillDialog}><CirclePlus size={16} /> {translate('بل جدید', language)}</button></div>
-        {table(['شماره', 'مشتری', 'تاریخ', 'جمع', 'پرداخت', 'باقی', 'عملیات'], filtered, (row) => <tr key={row.id}><td className="mono">{row.bill_number}</td><td>{row.customer_name}</td><td>{row.bill_date}</td><td>{formatMoney(row.grand_total_minor, currency)}</td><td>{formatMoney(row.paid_minor, currency)}</td><td className="amount-due">{formatMoney(row.remaining_minor, currency)}</td><td className="table-actions"><button className="icon-button" title={translate('ویرایش', language)} onClick={() => openEditBill(row.id)}><Pencil size={16} /></button><button className="icon-button" title={translate('چاپ', language)} onClick={() => setPrintBillId(row.id)}><Printer size={16} /></button><button className="icon-button danger-button" title={translate('حذف نرم', language)} onClick={() => remove(`/api/bills/${row.id}`)}><Trash2 size={16} /></button></td></tr>, 'بل')}
+        {table(['شماره', 'مشتری', 'تاریخ', 'جمع', 'پرداخت', 'باقی', 'عملیات'], filtered, (row) => <tr key={row.id}><td className="mono">{row.bill_number}</td><td>{row.customer_name}</td><td>{row.bill_date}</td><td>{formatMoney(row.grand_total_minor, currency)}</td><td>{formatMoney(row.paid_minor, currency)}</td><td className="amount-due">{formatMoney(row.remaining_minor, currency)}</td><td className="table-actions"><button className="icon-button" title={translate('ویرایش', language)} onClick={() => openEditBill(row.id)}><Pencil size={16} /></button><button className="icon-button" title={translate('چاپ', language)} onClick={() => printBill(row.id)}><Printer size={16} /></button><button className="icon-button danger-button" title={translate('حذف نرم', language)} onClick={() => remove(`/api/bills/${row.id}`)}><Trash2 size={16} /></button></td></tr>, 'بل')}
       </section>
       {billDialogOpen && typeof document !== 'undefined' && createPortal(<div className="modal-backdrop bill-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setBillDialogOpen(false); }}>
         <section className="content-panel bill-dialog" role="dialog" aria-modal="true" aria-labelledby="bill-dialog-title">
@@ -739,5 +759,5 @@ export default function Workspace({ section }) {
 
   const isInitialLoading = pageLoading || loadedSection !== section;
 
-  return <div className="app-shell"><aside className="sidebar">{nav}</aside>{mobileNav&&<div className="mobile-nav-backdrop" onClick={() => setMobileNav(false)}><aside className="sidebar mobile-sidebar" onClick={(event) => event.stopPropagation()}><button className="icon-button close-menu" onClick={() => setMobileNav(false)} aria-label={translate('بستن منو', language)}><X size={18}/></button>{nav}</aside></div>}<main className="main-area">{header}{busy && <div className="loading-line" aria-hidden="true" />}<div className="page-content" aria-busy={isInitialLoading}>{isInitialLoading ? <div className="initial-loading" role="status"><span className="loading-spinner" aria-hidden="true" /><span>{language === 'en' ? 'Loading…' : 'در حال بارگذاری…'}</span></div> : content}</div></main>{(error||message)&&<aside className={`notice-toast ${error?'is-error':'is-success'}`} role={error?'alert':'status'}><span className="notice-toast-icon">{error?<CircleAlert size={19}/>:<CircleCheck size={19}/>}</span><div className="notice-toast-body"><strong>{error?(language==='en'?'Something went wrong':'خطا'):(language==='en'?'Done':'انجام شد')}</strong><span>{translate(error || message, language)}</span></div><button type="button" className="notice-toast-close" onClick={() => { setError(''); setMessage(''); }} aria-label={translate('بستن', language)}><X size={16}/></button><i className="notice-toast-progress" aria-hidden="true" /></aside>}{section !== 'notifications' && siteNotifications.length > 0 && <aside className="notification-dock" aria-label={translate('اعلان‌ها', language)}><div className="notification-dock-head"><span className="notification-dock-icon"><BellRing size={17}/></span><div><strong>{translate('اعلان‌ها', language)}</strong><small>{siteNotifications.length} {language==='en'?'unread':'خوانده‌نشده'}</small></div><Link href="/notifications" className="notification-dock-link">{language==='en'?'View all':'همه'}</Link></div><div className="notification-dock-list">{siteNotifications.slice(0,3).map((item) => <article className="notification-card" key={item.id}><span className="notification-card-icon"><Bell size={15}/></span><div className="notification-card-body"><strong>{item.title}</strong><p>{item.body}</p><small>{item.created_at?.slice(0,10)}</small></div><div className="notification-card-actions"><button type="button" className="notification-card-button is-read" onClick={() => markNotificationRead(item.id)} aria-label={translate('علامت‌گذاری', language)}><CircleCheck size={15}/></button><button type="button" className="notification-card-button" onClick={() => setSiteNotifications((list) => list.filter((entry) => entry.id !== item.id))} aria-label={translate('بستن', language)}><X size={14}/></button></div></article>)}</div></aside>}{printBillId&&typeof document!=='undefined'&&createPortal(<div className="modal-backdrop print-dialog-backdrop" onMouseDown={(event)=>{if(event.target===event.currentTarget)setPrintBillId(null);}}><section className="print-dialog" role="dialog" aria-modal="true" aria-label={translate('پیش‌نمایش چاپ بل', language)}><div className="print-dialog-header"><strong>{translate('پیش‌نمایش چاپ بل', language)}</strong><button className="icon-button" onClick={()=>setPrintBillId(null)} aria-label={translate('بستن', language)}><X size={19}/></button></div><iframe title={translate('پیش‌نمایش چاپ بل', language)} src={`/bills/${printBillId}/print`} /></section></div>,document.body)}</div>;
+  return <div className="app-shell"><aside className="sidebar">{nav}</aside>{mobileNav&&<div className="mobile-nav-backdrop" onClick={() => setMobileNav(false)}><aside className="sidebar mobile-sidebar" onClick={(event) => event.stopPropagation()}><button className="icon-button close-menu" onClick={() => setMobileNav(false)} aria-label={translate('بستن منو', language)}><X size={18}/></button>{nav}</aside></div>}<main className="main-area">{header}{busy && <div className="loading-line" aria-hidden="true" />}<div className="page-content" aria-busy={isInitialLoading}>{isInitialLoading ? <div className="initial-loading" role="status"><span className="loading-spinner" aria-hidden="true" /><span>{language === 'en' ? 'Loading…' : 'در حال بارگذاری…'}</span></div> : content}</div></main>{(error||message)&&<aside className={`notice-toast ${error?'is-error':'is-success'}`} role={error?'alert':'status'}><span className="notice-toast-icon">{error?<CircleAlert size={19}/>:<CircleCheck size={19}/>}</span><div className="notice-toast-body"><strong>{error?(language==='en'?'Something went wrong':'خطا'):(language==='en'?'Done':'انجام شد')}</strong><span>{translate(error || message, language)}</span></div><button type="button" className="notice-toast-close" onClick={() => { setError(''); setMessage(''); }} aria-label={translate('بستن', language)}><X size={16}/></button><i className="notice-toast-progress" aria-hidden="true" /></aside>}{section !== 'notifications' && siteNotifications.length > 0 && <aside className="notification-dock" aria-label={translate('اعلان‌ها', language)}><div className="notification-dock-head"><span className="notification-dock-icon"><BellRing size={17}/></span><div><strong>{translate('اعلان‌ها', language)}</strong><small>{siteNotifications.length} {language==='en'?'unread':'خوانده‌نشده'}</small></div><Link href="/notifications" className="notification-dock-link">{language==='en'?'View all':'همه'}</Link></div><div className="notification-dock-list">{siteNotifications.slice(0,3).map((item) => <article className="notification-card" key={item.id}><span className="notification-card-icon"><Bell size={15}/></span><div className="notification-card-body"><strong>{item.title}</strong><p>{item.body}</p><small>{item.created_at?.slice(0,10)}</small></div><div className="notification-card-actions"><button type="button" className="notification-card-button is-read" onClick={() => markNotificationRead(item.id)} aria-label={translate('علامت‌گذاری', language)}><CircleCheck size={15}/></button><button type="button" className="notification-card-button" onClick={() => setSiteNotifications((list) => list.filter((entry) => entry.id !== item.id))} aria-label={translate('بستن', language)}><X size={14}/></button></div></article>)}</div></aside>}</div>;
 }

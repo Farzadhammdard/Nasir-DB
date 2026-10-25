@@ -417,7 +417,12 @@ export async function dispatchBusiness(method, parts, request, body = {}) {
   }
 
   if (resource === 'notifications' && method === 'GET') return all('SELECT * FROM notifications ORDER BY created_at DESC LIMIT 100');
-  if (resource === 'notifications' && id && method === 'PATCH') { await requireUser(); run('UPDATE notifications SET is_read=1 WHERE id=?',[id]); return { success:true }; }
+  if (resource === 'notifications' && id && method === 'PATCH') {
+    await requireUser();
+    if (id === 'all') run('UPDATE notifications SET is_read=1');
+    else run('UPDATE notifications SET is_read=1 WHERE id=?', [id]);
+    return { success: true };
+  }
 
   if (resource === 'settings' && method === 'GET') return getAppConfig();
   if (resource === 'settings' && method === 'PUT') { const allowed = ['company.name','company.address','company.phone','company.email','company.website','company.footer','bill.prefix','bill.start','bill.pad','customer.prefix','customer.start','customer.pad','payment.prefix','payment.start','expense.prefix','expense.start','expense.pad','report.prefix','report.start','report.pad','currency.code','currency.decimals','language','theme','timezone','print.show_logo','print.company_label','print.customer_label','print.footer','print.font_scale']; const entries = Object.fromEntries(Object.entries(body).filter(([key]) => allowed.includes(key))); setManySettings(entries); audit(user,'updated','settings'); return getAppConfig(); }

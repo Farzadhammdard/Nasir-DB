@@ -1,10 +1,9 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { all, get } from '@/lib/db';
 import { requirePermission } from '@/lib/auth';
 import { getAppConfig } from '@/lib/settings';
 import { formatMoney as formatMoneyBase } from '@/lib/money';
-import PrintButton from '@/components/PrintButton';
+import AutoPrint from '@/components/AutoPrint';
 import { withJsonStore } from '@/lib/json-store';
 
 const printMoney = (minor, options) => formatMoneyBase(minor, { ...options, decimals: 0 });
@@ -64,7 +63,7 @@ export default async function BillPrintPage({ params }) {
   );
   return (
     <main className="print-page" dir="rtl">
-      <div className="print-toolbar"><PrintButton /><Link className="button-secondary" href="/bills">بازگشت به بل‌ها</Link></div>
+      <AutoPrint />
       <article className="print-sheet">{copy('نسخه شرکت')}<p className="cut-line">برای برش</p>{copy('نسخه مشتری')}</article>
     </main>
   );
